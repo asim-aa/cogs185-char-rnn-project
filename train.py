@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 # https://github.com/spro/char-rnn.pytorch
+#train.py
 
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import argparse
 import os
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend, safe for servers/terminals
+import matplotlib.pyplot as plt
+import json
 
 from tqdm import tqdm
 
@@ -85,8 +90,11 @@ criterion = nn.CrossEntropyLoss()
 if args.cuda:
     decoder.cuda()
 
+import time
 start = time.time()
-all_losses = []
+
+# CHANGE 1: renamed all_losses -> loss_history for clarity
+loss_history = []
 loss_avg = 0
 
 try:
@@ -95,14 +103,31 @@ try:
         loss = train(*random_training_set(args.chunk_len, args.batch_size))
         loss_avg += loss
 
+        # CHANGE 2: record loss every epoch
+        loss_history.append(loss)
+
         if epoch % args.print_every == 0:
             print('[%s (%d %d%%) %.4f]' % (time_since(start), epoch, epoch / args.n_epochs * 100, loss))
             print(generate(decoder, 'Wh', 100, cuda=args.cuda), '\n')
 
-    print("Saving...")
+    print("Saving model...")
     save()
+
+    # CHANGE 3: save loss history to JSON
+    loss_file = "training_loss.json"
+    with open(loss_file, "w") as f:
+        json.dump(loss_history, f)
+    print(f"Saved loss history to {loss_file}")
+
+    # CHANGE 4: plot and save loss curve
+    plt.figure()
+    plt.plot(loss_history)
+    plt.title("Training Loss Curve")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.savefig("loss_curve.png")
+    print("Saved training loss curve as loss_curve.png")
 
 except KeyboardInterrupt:
     print("Saving before quit...")
     save()
-
